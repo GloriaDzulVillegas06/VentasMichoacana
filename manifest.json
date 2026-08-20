@@ -1,0 +1,14 @@
+{
+  "name": "La Michoacana · Control de ventas",
+  "short_name": "Michoacana",
+  "description": "Control móvil de ventas, inventario y pedidos",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#d61f69",
+  "background_color": "#fff8f3",
+  "lang": "es-MX",
+  "icons": [
+    { "src": "assets/logo.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#d61f69">
+  <meta name="description" content="Control de ventas, inventario y pedidos de La Michoacana">
+  <title>La Michoacana · Control de ventas</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div class="brand"><img src="assets/logo.png" alt=""><div><h1>🍧 La Michoacana</h1><p>Control de ventas</p></div></div>
+      <span id="demoBadge" class="demo-badge" hidden>Modo demostración</span>
+    </header>
+
+    <main>
+      <section id="view-home" class="view active" aria-labelledby="homeTitle">
+        <h2 id="homeTitle" class="sr-only">Inicio</h2>
+        <div id="dashboardCards" class="metric-grid"></div>
+        <article class="panel attention-panel">
+          <div class="section-heading"><div><span class="eyebrow">Inventario</span><h2>Atención</h2></div><span aria-hidden="true">⚠️</span></div>
+          <div id="lowStockList" class="attention-list"></div>
+        </article>
+        <section aria-labelledby="quickTitle"><h2 id="quickTitle">Acciones rápidas</h2><div class="quick-grid">
+          <button class="quick-card pink" data-go="sale"><span>🛒</span>Registrar venta</button>
+          <button class="quick-card green" id="quickEntry"><span>📦</span>Registrar mercancía</button>
+          <button class="quick-card orange" data-go="order"><span>📝</span>Hacer pedido</button>
+          <button class="quick-card purple" id="quickShare"><span>💬</span>Compartir existencias</button>
+        </div></section>
+      </section>
+
+      <section id="view-sale" class="view" aria-labelledby="saleTitle">
+        <div class="section-heading"><div><span class="eyebrow">Venta nueva</span><h2 id="saleTitle">¿Qué se vendió?</h2></div><button id="undoSaleBtn" class="text-button danger">↶ Deshacer última</button></div>
+        <label class="field"><span>Vendedor</span><select id="sellerSelect"><option>Cargando vendedores…</option></select></label>
+        <div id="saleProducts" class="product-grid"></div>
+        <div class="sale-summary"><div><span>Productos</span><strong id="saleItemCount">0</strong></div><div><span>Total</span><strong id="saleTotal">$0</strong></div><button id="registerSaleBtn" class="primary-button" disabled>Registrar venta · $0</button></div>
+      </section>
+
+      <section id="view-inventory" class="view" aria-labelledby="inventoryTitle">
+        <div class="section-heading"><div><span class="eyebrow">Existencias</span><h2 id="inventoryTitle">Inventario</h2></div><button id="inventoryEntryBtn" class="small-button">+ Mercancía</button></div>
+        <label class="search-box">🔎<input id="inventorySearch" type="search" placeholder="Buscar producto…" autocomplete="off"></label>
+        <div class="legend"><span><i class="dot normal"></i>Normal</span><span><i class="dot low"></i>Bajo</span><span><i class="dot out"></i>Agotado</span></div>
+        <div id="inventoryProducts" class="inventory-list"></div>
+      </section>
+
+      <section id="view-order" class="view" aria-labelledby="orderTitle">
+        <div class="section-heading"><div><span class="eyebrow">Reposición</span><h2 id="orderTitle">Hacer pedido</h2></div><button id="ordersHistoryBtn" class="text-button">Ver pedidos</button></div>
+        <article class="budget-card"><label for="budgetInput">Presupuesto disponible</label><div class="money-input"><span>$</span><input id="budgetInput" type="number" inputmode="decimal" min="0" step="10" placeholder="0"></div><button id="generateOrderBtn" class="secondary-button">✨ Generar recomendación</button></article>
+        <div id="orderProducts" class="order-list"></div>
+        <div id="orderSummary" class="order-summary" hidden><div><span>Total del pedido</span><strong id="orderTotal">$0</strong></div><div><span>Presupuesto restante</span><strong id="orderRemaining">$0</strong></div><button id="shareOrderBtn" class="whatsapp-button">💬 Enviar pedido por WhatsApp</button><button id="createOrderBtn" class="primary-button">Guardar pedido</button></div>
+      </section>
+
+      <section id="view-history" class="view" aria-labelledby="historyTitle">
+        <div class="section-heading"><div><span class="eyebrow">Actividad</span><h2 id="historyTitle">Historial</h2></div></div>
+        <div class="filter-tabs" id="historyFilters"><button data-period="today" class="active">Hoy</button><button data-period="week">Semana</button><button data-period="month">Mes</button><button data-period="custom">Personalizado</button></div>
+        <div id="customDates" class="date-fields" hidden><label>Desde<input id="dateFrom" type="date"></label><label>Hasta<input id="dateTo" type="date"></label><button id="applyDates" class="small-button">Aplicar</button></div>
+        <p id="historyRangeCaption" class="range-caption">Mostrando: Hoy</p>
+        <article class="panel receivables-panel"><div class="section-heading"><div><span class="eyebrow">Crédito</span><h2>Por cobrar</h2></div><strong id="receivablesTotal">$0</strong></div><div id="receivablesList" class="receivables-list"></div></article>
+        <div id="historyStats" class="stats-strip"></div>
+        <div id="salesHistory" class="history-list"></div>
+        <article class="panel"><h2>Resumen de ventas</h2><div id="periodStatistics" class="period-statistics"></div></article>
+        <article class="panel"><h2>Productos más vendidos</h2><div id="topProducts" class="ranking"></div><h3>Menos vendidos</h3><div id="bottomProducts" class="ranking compact"></div></article>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <button data-view="home" class="active"><span>🏠</span>Inicio</button><button data-view="sale"><span>🛒</span>Venta</button><button data-view="inventory"><span>📦</span>Inventario</button><button data-view="order"><span>📝</span>Pedido</button><button data-view="history"><span>🕘</span>Historial</button>
+    </nav>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop" hidden>
+    <section id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-header"><h2 id="modalTitle"></h2><button id="modalClose" class="icon-button" aria-label="Cerrar">×</button></div><div id="modalBody"></div></section>
+  </div>
+  <div id="confirmBackdrop" class="confirm-backdrop" hidden>
+    <section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+      <div class="confirm-icon">❓</div><h2 id="confirmTitle">Confirmar acción</h2><p id="confirmMessage"></p>
+      <div class="confirm-actions"><button id="confirmCancelBtn" class="secondary-button">Cancelar</button><button id="confirmAcceptBtn" class="primary-button">Sí, confirmar</button></div>
+    </section>
+  </div>
+  <div id="loading" class="loading" hidden><div class="spinner"></div><span>Cargando…</span></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="script.js"></script>
+</body>
+</html>
