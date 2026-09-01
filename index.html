@@ -15,7 +15,7 @@
   <div id="app" class="app-shell">
     <header class="topbar">
       <div class="brand"><img src="assets/logo.png" alt=""><div><h1>🍧 La Michoacana</h1><p>Control de ventas</p></div></div>
-      <span id="demoBadge" class="demo-badge" hidden>Modo demostración</span>
+      <div class="top-actions"><button id="notificationBtn" class="notification-button" aria-label="Recordatorios">🔔<span id="notificationCount" hidden>0</span></button><span id="demoBadge" class="demo-badge" hidden>Configura Supabase</span></div>
     </header>
 
     <main>
@@ -31,6 +31,8 @@
           <button class="quick-card green" id="quickEntry"><span>📦</span>Registrar mercancía</button>
           <button class="quick-card orange" data-go="order"><span>📝</span>Hacer pedido</button>
           <button class="quick-card purple" id="quickShare"><span>💬</span>Compartir existencias</button>
+          <button class="quick-card blue" id="quickCustomerOrder"><span>📅</span>Levantar apartado</button>
+          <button class="quick-card teal" id="quickCustomerOrders"><span>🧺</span>Ver apartados</button>
         </div></section>
       </section>
 
@@ -42,14 +44,15 @@
       </section>
 
       <section id="view-inventory" class="view" aria-labelledby="inventoryTitle">
-        <div class="section-heading"><div><span class="eyebrow">Existencias</span><h2 id="inventoryTitle">Inventario</h2></div><button id="inventoryEntryBtn" class="small-button">+ Mercancía</button></div>
+        <div class="section-heading"><div><span class="eyebrow">Existencias</span><h2 id="inventoryTitle">Inventario</h2></div><div class="inventory-heading-actions"><button id="newProductBtn" class="small-button">+ Producto</button><button id="inventoryEntryBtn" class="small-button">+ Mercancía</button></div></div>
         <label class="search-box">🔎<input id="inventorySearch" type="search" placeholder="Buscar producto…" autocomplete="off"></label>
         <div class="legend"><span><i class="dot normal"></i>Normal</span><span><i class="dot low"></i>Bajo</span><span><i class="dot out"></i>Agotado</span></div>
         <div id="inventoryProducts" class="inventory-list"></div>
       </section>
 
       <section id="view-order" class="view" aria-labelledby="orderTitle">
-        <div class="section-heading"><div><span class="eyebrow">Reposición</span><h2 id="orderTitle">Hacer pedido</h2></div><button id="ordersHistoryBtn" class="text-button">Ver pedidos</button></div>
+        <div class="section-heading"><div><span class="eyebrow">Reposición</span><h2 id="orderTitle">Hacer pedido</h2></div><button id="ordersHistoryBtn" class="text-button">Ver pedidos proveedor</button></div>
+        <div class="order-mode-actions"><button id="newCustomerOrderBtn" class="small-button">📅 Nuevo apartado</button><button id="customerOrdersBtn" class="small-button">🧺 Apartados clientes</button></div>
         <article class="budget-card"><label for="budgetInput">Presupuesto disponible</label><div class="money-input"><span>$</span><input id="budgetInput" type="number" inputmode="decimal" min="0" step="10" placeholder="0"></div><button id="generateOrderBtn" class="secondary-button">✨ Generar recomendación</button></article>
         <div id="orderProducts" class="order-list"></div>
         <div id="orderSummary" class="order-summary" hidden><div><span>Total del pedido</span><strong id="orderTotal">$0</strong></div><div><span>Presupuesto restante</span><strong id="orderRemaining">$0</strong></div><button id="shareOrderBtn" class="whatsapp-button">💬 Enviar pedido por WhatsApp</button><button id="createOrderBtn" class="primary-button">Guardar pedido</button></div>
@@ -84,6 +87,7 @@
   </div>
   <div id="loading" class="loading" hidden><div class="spinner"></div><span>Cargando…</span></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
