@@ -366,7 +366,46 @@ function openCustomerOrders(){
   $$('[data-pay-customer]').forEach(b=>b.addEventListener('click',()=>openCustomerOrderPayment(orders.find(o=>o.id===b.dataset.payCustomer))));
   $$('[data-deliver-customer]').forEach(b=>b.addEventListener('click',()=>openCustomerOrderDelivery(orders.find(o=>o.id===b.dataset.deliverCustomer))));
 }
-function buildCustomerOrderMessage(o){return [`🍧 Pedido apartado`,`Cliente: ${o.clienteNombre}`,`Entrega: ${dateTime.format(new Date(o.fechaEntrega))}`,'',...(o.detalles||[]).map(d=>`${d.productoNombre||state.products.find(p=>p.productoId===d.productoId)?.nombre||d.productoId} × ${d.cantidad}`),'',`Total: ${money.format(Number(o.total||0))}`,Number(o.montoPendiente)>0?`Pendiente: ${money.format(Number(o.montoPendiente))}`:'Pagado ✅'].join('\n')}
+function buildShareMessage(showQty = false) { const available = state.products.filter(p => p.activo && Number(p.stockDisponible ?? p.stock) > 0);
+  const troles = available.filter(p => p.categoria === 'Trol');
+  const others = available.filter(p => p.categoria !== 'Trol');
+  let lines = ['🍧 LA MICHOACANA 🍧','',
+    'Sabores disponibles hoy:',
+    '',
+    ...troles.map(
+      p =>
+        `${p.emoji || '🍧'} ${p.nombre}` +
+        (showQty
+          ? ` — ${Number(p.stockDisponible ?? p.stock)}`
+          : '')
+    )
+  ];
+
+  if (troles.length) {
+    lines.push('', `💲${troles[0].precioVenta} c/u`);
+  }
+
+  if (others.length) {
+    lines.push(
+      '',
+      'También tenemos:',
+      ...others.map(
+        p =>
+          `${p.emoji || '✨'} ${p.nombre}` +
+          (showQty
+            ? ` — ${Number(p.stockDisponible ?? p.stock)}`
+            : '') +
+          ` · ${money.format(p.precioVenta)}`
+      )
+    );
+  }
+
+  if (state.config?.mensajeWhatsApp) {
+    lines.push('', '✨ ' + state.config.mensajeWhatsApp);
+  }
+
+  return lines.join('\n');
+}
 function shareCustomerOrder(o){window.open(`https://wa.me/?text=${encodeURIComponent(buildCustomerOrderMessage(o))}`,'_blank','noopener')}
 async function changeCustomerOrderStatus(id,estado){if(!await appConfirm(estado==='CANCELADO'?'Al cancelar, los productos vuelven a quedar disponibles. ¿Continuar?':'¿Confirmar este pedido?',estado==='CANCELADO'?'Cancelar apartado':'Confirmar apartado'))return;setLoading(true);try{await apiRequest('changeCustomerOrderStatus',{pedidoId:id,estado});await refreshAll(false);openCustomerOrders();toast('Pedido actualizado')}catch(e){toast(e.message,true)}finally{setLoading(false)}}
 function openCustomerOrderPayment(o){openModal(`Anticipo · ${o.clienteNombre}`,`<form id="customerPayForm" class="modal-form"><p>Pendiente: <strong>${money.format(Number(o.montoPendiente))}</strong></p><label>Monto<input id="customerPayAmount" type="number" min="0.01" max="${o.montoPendiente}" step="0.01" value="${o.montoPendiente}" required></label><label>Método<select id="customerPayMethod"><option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option><option value="OTRO">Otro</option></select></label><label>Referencia<input id="customerPayRef" placeholder="Opcional"></label><button class="primary-button">Guardar anticipo</button></form>`);$('#customerPayForm').addEventListener('submit',async e=>{e.preventDefault();setLoading(true);try{await apiRequest('payCustomerOrder',{pedidoId:o.id,metodo:$('#customerPayMethod').value,monto:Number($('#customerPayAmount').value),referencia:$('#customerPayRef').value});await refreshAll(false);openCustomerOrders();toast('Anticipo registrado')}catch(err){toast(err.message,true)}finally{setLoading(false)}})}
