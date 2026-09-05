@@ -1995,4 +1995,101 @@ end;
 $$;
 
 grant execute on function public.crear_producto(text,text,text,numeric,numeric,integer,integer,integer) to anon;
-grant execute on function public.actualizar_producto(text,text,text,numeric,numeric,integer,integer,boolean) to anon;
+grant execute on function public.actualizar_producto(text,text,text,text,numeric,numeric,integer,integer,boolean) to anon;
+
+
+-- ============================================================
+-- PERMISOS ADICIONALES Y RECARGA DE ESQUEMA
+-- ============================================================
+grant execute on function public.crear_producto(text,text,text,numeric,numeric,integer,integer,integer) to authenticated;
+grant execute on function public.actualizar_producto(text,text,text,text,numeric,numeric,integer,integer,boolean) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================
+-- FUNCIÓN: MODIFICAR PEDIDO A PROVEEDOR PENDIENTE
+-- Permite agregar/quitar productos o cambiar cantidades antes de recibirlo.
+-- ============================================================
+create or replace function public.actualizar_pedido_proveedor(
+    p_pedido_id uuid,
+    p_presupuesto numeric,
+    p_items jsonb,
+    p_notas text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_pedido public.pedidos_proveedor%rowtype;
+    v_item jsonb;
+    v_producto public.productos%rowtype;
+    v_cantidad integer;
+    v_total numeric(10,2) := 0;
+begin
+    select * into v_pedido
+    from public.pedidos_proveedor
+    where id = p_pedido_id
+    for update;
+
+    if not found then
+        raise exception 'Pedido no encontrado';
+    end if;
+
+    if v_pedido.estado <> 'PEDIDO' then
+        raise exception 'Solo se pueden modificar pedidos pendientes';
+    end if;
+
+    if p_presupuesto < 0 then
+        raise exception 'Presupuesto inválido';
+    end if;
+
+    if p_items is null or jsonb_array_length(p_items) = 0 then
+        raise exception 'Debes agregar productos';
+    end if;
+
+    delete from public.pedido_proveedor_detalles
+    where pedido_id = p_pedido_id;
+
+    for v_item in select * from jsonb_array_elements(p_items)
+    loop
+        v_cantidad := (v_item->>'cantidad')::integer;
+        if v_cantidad <= 0 then
+            raise exception 'Cantidad inválida';
+        end if;
+
+        select * into v_producto
+        from public.productos
+        where id = v_item->>'productoId';
+        if not found then
+            raise exception 'Producto no encontrado';
+        end if;
+
+        insert into public.pedido_proveedor_detalles(
+            pedido_id, producto_id, cantidad, precio_compra, subtotal
+        ) values (
+            p_pedido_id, v_producto.id, v_cantidad, v_producto.precio_compra,
+            v_cantidad * v_producto.precio_compra
+        );
+
+        v_total := v_total + (v_cantidad * v_producto.precio_compra);
+    end loop;
+
+    if p_presupuesto > 0 and v_total > p_presupuesto then
+        raise exception 'El pedido excede el presupuesto';
+    end if;
+
+    update public.pedidos_proveedor
+    set presupuesto = p_presupuesto,
+        total_estimado = v_total,
+        notas = p_notas
+    where id = p_pedido_id;
+
+    return p_pedido_id;
+end;
+$$;
+
+grant execute on function public.actualizar_pedido_proveedor(uuid,numeric,jsonb,text) to anon;
+grant execute on function public.actualizar_pedido_proveedor(uuid,numeric,jsonb,text) to authenticated;
+notify pgrst, 'reload schema';

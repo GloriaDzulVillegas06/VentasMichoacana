@@ -23,6 +23,7 @@ const initialProducts = [
 let state = { products: [], sales: [], orders: [], customerOrders: [], notifications: [], movements: [], sellers: [], receivables: [], payments: [], config: { nombreNegocio:'La Michoacana', mensajeWhatsApp:'¡Sabor que te enamora!', moneda:'MXN' }, dashboard:null, statistics:null };
 let saleCart = {};
 let orderCart = {};
+let editingOrderId = null;
 let historyPeriod = 'today';
 let confirmResolver = null;
 
@@ -52,6 +53,7 @@ function bindEvents() {
   $('#generateOrderBtn').addEventListener('click', () => generarPedidoPorPresupuesto(Number($('#budgetInput').value)));
   $('#budgetInput').addEventListener('input', updateOrderSummary);
   $('#createOrderBtn').addEventListener('click', createOrder);
+  $('#cancelOrderEditBtn').addEventListener('click', cancelOrderEdit);
   $('#shareOrderBtn').addEventListener('click', () => shareOrderByWhatsApp());
   $('#ordersHistoryBtn').addEventListener('click', openOrders);
   $('#modalClose').addEventListener('click', closeModal);
@@ -139,6 +141,9 @@ async function apiRequest(action, data = {}) {
       case 'createOrder':
         result = await supabaseRpc('crear_pedido_proveedor', { p_presupuesto:Number(data.presupuesto), p_items:data.detalles, p_notas:null });
         return { success:true, data:result, message:'Pedido guardado' };
+      case 'updateOrder':
+        result = await supabaseRpc('actualizar_pedido_proveedor', { p_pedido_id:data.pedidoId, p_presupuesto:Number(data.presupuesto), p_items:data.detalles, p_notas:null });
+        return { success:true, data:result, message:'Pedido actualizado' };
       case 'receiveOrder':
         await supabaseRpc('recibir_pedido_proveedor', { p_pedido_id:data.pedidoId });
         return { success:true, data:null, message:'Pedido recibido' };
@@ -264,7 +269,7 @@ async function submitInventoryEntry(e){e.preventDefault();const detalles=$$('[da
 function openAdjustment(id){const p=state.products.find(x=>x.productoId===id),physical=Number(p.stockFisico??p.stock);openModal(`Modificar ${p.nombre}`,`<form id="adjustForm" class="modal-form"><p>Stock físico actual: <strong>${physical}</strong> · Apartado: <strong>${Number(p.stockApartado??0)}</strong></p><label>Motivo<select id="adjustReason"><option value="ENTRADA">Entrada de mercancía</option><option value="AJUSTE">Ajuste</option><option value="MERMA">Merma</option><option value="MERMA">Producto dañado</option><option value="AJUSTE">Otro</option></select></label><label>Cambio de unidades<input id="adjustQty" type="number" step="1" inputmode="numeric" placeholder="Ej. 5 o -2" required></label><label>Nota<input id="adjustNote" maxlength="120" placeholder="Motivo breve"></label><button type="submit" class="primary-button">Guardar movimiento</button></form>`);$('#adjustForm').addEventListener('submit',async e=>{e.preventDefault();const cantidad=Number($('#adjustQty').value);if(!cantidad||physical+cantidad<0)return toast('La cantidad no es válida',true);if(!await appConfirm(`¿Cambiar el stock físico de ${physical} a ${physical+cantidad}?`,'Modificar inventario'))return;setLoading(true);try{await apiRequest('adjustInventory',{productoId:id,cantidad,tipo:$('#adjustReason').value,motivo:$('#adjustNote').value||$('#adjustReason option:checked').textContent});closeModal();toast('Inventario actualizado');await refreshAll(false)}catch(err){console.error(err);toast(err.message,true)}finally{setLoading(false)}})}
 
 function openShare(){let showQty=false;const draw=()=>{const message=buildShareMessage(showQty);$('#modalBody').innerHTML=`<div class="switch-row"><strong>Mostrar cantidades</strong><label class="switch"><input id="showQty" type="checkbox" ${showQty?'checked':''}><span></span></label></div><div class="share-preview">${escapeHtml(message)}</div><div class="modal-actions"><button id="copyShare" class="secondary-button">📋 Copiar lista</button><button id="whatsappShare" class="primary-button">💬 Enviar por WhatsApp</button></div>`;$('#showQty').addEventListener('change',e=>{showQty=e.target.checked;draw()});$('#copyShare').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(message);toast('Lista copiada')}catch(e){console.error(e);toast('No se pudo copiar; mantén presionado el texto.',true)}});$('#whatsappShare').addEventListener('click',()=>window.open(`https://wa.me/?text=${encodeURIComponent(message)}`,'_blank','noopener'))};openModal('Compartir existencias','');draw()}
-function buildShareMessage(showQty=false){const available=state.products.filter(p=>p.activo&&Number(p.stockDisponible??p.stock)>0);const troles=available.filter(p=>p.categoria==='Trol');const others=available.filter(p=>p.categoria!=='Trol');let lines=['🍧 LA MICHOACANA 🍧','','Sabores disponibles hoy:','',...troles.map(p=>`${p.emoji} ${p.nombre}${showQty?` — ${Number(p.stockDisponible??p.stock)}`:''}`)];if(troles.length)lines.push('',`💲${troles[0].precioVenta} c/u`);if(others.length)lines.push('','También tenemos:',...others.map(p=>`${p.emoji} ${p.nombre}${showQty?` — ${Number(p.stockDisponible??p.stock)}`:''} · ${money.format(p.precioVenta)}`));lines.push('','✨ '+state.config.mensajeWhatsApp);return lines.join('\n')}
+function buildShareMessage(showQty=false){const available=state.products.filter(p=>p.activo&&Number(p.stockDisponible??p.stock)>0);const troles=available.filter(p=>p.categoria==='Trol');const others=available.filter(p=>p.categoria!=='Trol');let lines=['🍧 LA MICHOACANA 🍧','','Sabores disponibles hoy:','',...troles.map(p=>`${p.emoji||'🍧'} ${p.nombre}${showQty?` — ${Number(p.stockDisponible??p.stock)}`:''}`)];if(troles.length)lines.push('',`💲${troles[0].precioVenta} c/u`);if(others.length)lines.push('','También tenemos:',...others.map(p=>`${p.emoji||'✨'} ${p.nombre}${showQty?` — ${Number(p.stockDisponible??p.stock)}`:''} · ${money.format(p.precioVenta)}`));if(state.config?.mensajeWhatsApp)lines.push('','✨ '+state.config.mensajeWhatsApp);return lines.join('\n')}
 
 function generarPedidoPorPresupuesto(presupuesto){orderCart={};if(!Number.isFinite(presupuesto)||presupuesto<=0){renderOrderProducts();return toast('Escribe un presupuesto mayor que cero',true)}const all=[...state.products].filter(p=>p.activo&&p.precioCompra>0),hasSales=all.some(p=>Number(p.ventasUltimos30Dias)>0),products=all.filter(p=>!hasSales||Number(p.ventasUltimos30Dias)>0).sort((a,b)=>recommendationScore(b)-recommendationScore(a));let remaining=presupuesto;for(const p of products){const desired=suggestedOrderQuantity(p,hasSales),qty=Math.min(desired,Math.floor(remaining/p.precioCompra));if(qty>0){orderCart[p.productoId]=qty;remaining-=qty*p.precioCompra}}renderOrderProducts();toast('Pedido basado en ventas de los últimos 30 días')}
 function priority(p){const stock=Number(p.stockDisponible??p.stock);return stock===0?0:stock<p.stockMinimo?1:stock<p.stockIdeal?2:3}
@@ -276,9 +281,65 @@ function orderTotal(){return Object.entries(orderCart).reduce((s,[id,q])=>s+stat
 function updateOrderSummary(){const budget=Number($('#budgetInput').value)||0,total=orderTotal();$('#orderSummary').hidden=total<=0;$('#orderTotal').textContent=money.format(total);$('#orderRemaining').textContent=money.format(Math.max(0,budget-total));$('#createOrderBtn').disabled=total<=0||total>budget}
 function buildOrderMessage(details){const lines=['Quisiera pedir:',''];details.filter(d=>Number(d.cantidad)>0).forEach(d=>{const p=state.products.find(x=>x.productoId===d.productoId);lines.push(`${p?.nombre||d.productoId} × ${d.cantidad}`)});return lines.join('\n')}
 function shareOrderByWhatsApp(order=null){const details=order?order.detalles:Object.entries(orderCart).filter(([,cantidad])=>cantidad>0).map(([productoId,cantidad])=>({productoId,cantidad}));const total=order?Number(order.costoTotal):orderTotal();if(!details.length)return toast('El pedido está vacío',true);const message=buildOrderMessage(details,total,order?.pedidoId||'');window.open(`https://wa.me/?text=${encodeURIComponent(message)}`,'_blank','noopener')}
-async function createOrder(){const presupuesto=Number($('#budgetInput').value),detalles=Object.entries(orderCart).filter(([,cantidad])=>cantidad>0).map(([productoId,cantidad])=>({productoId,cantidad}));if(orderTotal()>presupuesto)return toast('El pedido excede el presupuesto',true);if(!await appConfirm(`¿Guardar este pedido por ${money.format(orderTotal())}?`,'Guardar pedido'))return;setLoading(true);try{const r=await apiRequest('createOrder',{presupuesto,detalles,estado:'PEDIDO'});toast(r.message||'Pedido guardado');orderCart={};$('#budgetInput').value='';await refreshAll(false);renderOrderProducts()}catch(e){console.error(e);toast(e.message,true)}finally{setLoading(false)}}
+async function createOrder(){
+  const presupuesto=Number($('#budgetInput').value);
+  const detalles=Object.entries(orderCart).filter(([,cantidad])=>cantidad>0).map(([productoId,cantidad])=>({productoId,cantidad}));
+  if(!detalles.length)return toast('Agrega al menos un producto',true);
+  if(orderTotal()>presupuesto)return toast('El pedido excede el presupuesto',true);
+  const editing=Boolean(editingOrderId);
+  const title=editing?'Guardar cambios':'Guardar pedido';
+  const question=editing?`¿Guardar los cambios de este pedido por ${money.format(orderTotal())}?`:`¿Guardar este pedido por ${money.format(orderTotal())}?`;
+  if(!await appConfirm(question,title))return;
+  setLoading(true);
+  try{
+    const r=await apiRequest(editing?'updateOrder':'createOrder',{pedidoId:editingOrderId,presupuesto,detalles,estado:'PEDIDO'});
+    toast(r.message||(editing?'Pedido actualizado':'Pedido guardado'));
+    resetOrderEditor();
+    await refreshAll(false);
+    renderOrderProducts();
+  }catch(e){console.error(e);toast(e.message,true)}finally{setLoading(false)}
+}
 
-function openOrders(){const html=state.orders.length?state.orders.map(o=>`<article class="history-card"><div class="history-head"><strong>${o.pedidoId}</strong><span>${dateTime.format(new Date(o.fecha))}</span></div><div class="history-items">${o.detalles.map(d=>{const p=state.products.find(x=>x.productoId===d.productoId);return `${p?.emoji||''} ${escapeHtml(p?.nombre||d.productoId)} × ${d.cantidad}<br>`}).join('')}</div><div class="history-total"><span>${o.estado}</span><span>${money.format(o.costoTotal)}</span></div><button class="whatsapp-button" data-share-order="${o.pedidoId}">💬 Enviar por WhatsApp</button>${o.estado==='PEDIDO'?`<button class="secondary-button" data-receive="${o.pedidoId}">Marcar como recibido</button>`:''}</article>`).join(''):'<div class="empty">Aún no hay pedidos</div>';openModal('Pedidos',`<div class="history-list">${html}</div>`);$$('[data-receive]').forEach(b=>b.addEventListener('click',()=>receiveOrder(b.dataset.receive)));$$('[data-share-order]').forEach(b=>b.addEventListener('click',()=>shareOrderByWhatsApp(state.orders.find(o=>o.pedidoId===b.dataset.shareOrder))))}
+function resetOrderEditor(){
+  editingOrderId=null;
+  orderCart={};
+  $('#budgetInput').value='';
+  $('#createOrderBtn').textContent='Guardar pedido';
+  $('#cancelOrderEditBtn').hidden=true;
+  updateOrderSummary();
+}
+
+function cancelOrderEdit(){
+  if(!editingOrderId)return;
+  resetOrderEditor();
+  renderOrderProducts();
+  toast('Edición cancelada');
+}
+
+function editProviderOrder(id){
+  const o=state.orders.find(x=>x.pedidoId===id);
+  if(!o)return toast('No se encontró el pedido',true);
+  if(o.estado!=='PEDIDO')return toast('Solo se pueden modificar pedidos pendientes',true);
+  editingOrderId=id;
+  orderCart={};
+  (o.detalles||[]).forEach(d=>{orderCart[d.productoId]=Number(d.cantidad)||0});
+  $('#budgetInput').value=Number(o.presupuesto)||Number(o.costoTotal)||0;
+  $('#createOrderBtn').textContent='Guardar cambios';
+  $('#cancelOrderEditBtn').hidden=false;
+  closeModal();
+  navigate('order');
+  renderOrderProducts();
+  updateOrderSummary();
+  toast('Pedido cargado para modificar');
+}
+
+function openOrders(){
+  const html=state.orders.length?state.orders.map(o=>`<article class="history-card"><div class="history-head"><strong>${o.pedidoId}</strong><span>${dateTime.format(new Date(o.fecha))}</span></div><div class="history-items">${o.detalles.map(d=>{const p=state.products.find(x=>x.productoId===d.productoId);return `${p?.emoji||''} ${escapeHtml(p?.nombre||d.productoId)} × ${d.cantidad}<br>`}).join('')}</div><div class="history-total"><span>${o.estado}</span><span>${money.format(o.costoTotal)}</span></div><button class="whatsapp-button" data-share-order="${o.pedidoId}">💬 Enviar por WhatsApp</button>${o.estado==='PEDIDO'?`<button class="secondary-button" data-edit-order="${o.pedidoId}">✏️ Modificar pedido</button><button class="secondary-button" data-receive="${o.pedidoId}">Marcar como recibido</button>`:''}</article>`).join(''):'<div class="empty">Aún no hay pedidos</div>';
+  openModal('Pedidos',`<div class="history-list">${html}</div>`);
+  $$('[data-edit-order]').forEach(b=>b.addEventListener('click',()=>editProviderOrder(b.dataset.editOrder)));
+  $$('[data-receive]').forEach(b=>b.addEventListener('click',()=>receiveOrder(b.dataset.receive)));
+  $$('[data-share-order]').forEach(b=>b.addEventListener('click',()=>shareOrderByWhatsApp(state.orders.find(o=>o.pedidoId===b.dataset.shareOrder))));
+}
 async function receiveOrder(id){if(!await appConfirm('¿Confirmas que recibiste todo este pedido?','Recibir pedido'))return;setLoading(true);try{await apiRequest('receiveOrder',{pedidoId:id});closeModal();toast('Pedido recibido e inventario actualizado');await refreshAll(false)}catch(e){console.error(e);toast(e.message,true)}finally{setLoading(false)}}
 
 function renderHistory(){if(!state.sales)return;const range=getHistoryRange();const sales=state.sales.filter(s=>{const d=new Date(s.fecha);return d>=range.from&&d<=range.to});const active=sales.filter(s=>s.estado==='ACTIVA');const count=active.reduce((n,s)=>n+s.cantidadProductos,0),total=active.reduce((n,s)=>n+s.total,0);$('#historyStats').innerHTML=`<div class="stat-mini"><span>Ventas</span><strong>${active.length}</strong></div><div class="stat-mini"><span>Productos</span><strong>${count}</strong></div><div class="stat-mini"><span>Total</span><strong>${money.format(total)}</strong></div>`;$('#salesHistory').innerHTML=sales.length?sales.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).map(s=>`<article class="history-card ${s.estado==='CANCELADA'?'cancelled':''}"><div class="history-head"><span>${dateTime.format(new Date(s.fecha))}</span><span>${escapeHtml(s.vendedor)}</span></div><div class="history-items">${s.detalles.map(d=>{const p=state.products.find(x=>x.productoId===d.productoId);return `${p?.emoji||''} ${escapeHtml(p?.nombre||d.productoId)} × ${d.cantidad} · ${escapeHtml(d.cliente||'Cliente')} <small>${d.estadoPago||'PAGADO'}${Number(d.montoPendiente)>0?` · debe ${money.format(d.montoPendiente)}`:''}</small><br>`}).join('')}</div><div class="history-total"><span>${s.estado==='CANCELADA'?'<i class="cancelled-tag">CANCELADA</i>':'Total'}</span><span>${money.format(s.total)}</span></div></article>`).join(''):'<div class="empty">No hay ventas en este periodo</div>';renderRankings(active)}
@@ -312,6 +373,7 @@ async function demoApi(action,data){await new Promise(r=>setTimeout(r,180));cons
   if(action==='registerInventoryEntry'){const ref=data.pedidoId||'ENTRADA-MANUAL';data.detalles.forEach(d=>{if(d.cantidad>0)movement(product(d.productoId),d.cantidad,'ENTRADA',ref,'Entrada de mercancía')});if(data.pedidoId){const o=db.orders.find(x=>x.pedidoId===data.pedidoId);if(o)o.estado='RECIBIDO'}saveDemo(db);return{success:true,data:null,message:'Mercancía registrada'}}
   if(action==='adjustInventory'){const p=product(data.productoId);if(!p||!data.cantidad||p.stock+data.cantidad<0)throw new Error('Ajuste inválido');movement(p,data.cantidad,data.tipo,'AJUSTE-MANUAL',data.motivo);saveDemo(db);return{success:true,data:p,message:'Inventario actualizado'}}
   if(action==='createOrder'){const costoTotal=data.detalles.reduce((n,d)=>n+product(d.productoId).precioCompra*d.cantidad,0);if(costoTotal>data.presupuesto)throw new Error('El pedido excede el presupuesto');const pedidoId=demoId('P',db.orders,'pedidoId');const order={pedidoId,fecha:new Date().toISOString(),presupuesto:data.presupuesto,costoTotal,estado:data.estado||'PEDIDO',detalles:data.detalles.map(d=>({...d,precioCompra:product(d.productoId).precioCompra,subtotal:product(d.productoId).precioCompra*d.cantidad}))};db.orders.push(order);saveDemo(db);return{success:true,data:order,message:'Pedido guardado'}}
+  if(action==='updateOrder'){const o=db.orders.find(x=>x.pedidoId===data.pedidoId);if(!o||o.estado!=='PEDIDO')throw new Error('Solo se pueden modificar pedidos pendientes');const costoTotal=data.detalles.reduce((n,d)=>n+product(d.productoId).precioCompra*d.cantidad,0);if(costoTotal>data.presupuesto)throw new Error('El pedido excede el presupuesto');o.presupuesto=data.presupuesto;o.costoTotal=costoTotal;o.detalles=data.detalles.map(d=>({...d,precioCompra:product(d.productoId).precioCompra,subtotal:product(d.productoId).precioCompra*d.cantidad}));saveDemo(db);return{success:true,data:o,message:'Pedido actualizado'}}
   if(action==='receiveOrder'){const o=db.orders.find(x=>x.pedidoId===data.pedidoId);if(!o||o.estado!=='PEDIDO')throw new Error('El pedido no está pendiente');o.detalles.forEach(d=>movement(product(d.productoId),d.cantidad,'ENTRADA',o.pedidoId,'Pedido recibido'));o.estado='RECIBIDO';saveDemo(db);return{success:true,data:o,message:'Pedido recibido'}}
   if(action==='getSales')return{success:true,data:db.sales,message:''};if(action==='getStatistics')return{success:true,data:{},message:''};if(action==='getOrders')return{success:true,data:db.orders,message:''};throw new Error(`Acción demo no implementada: ${action}`)
 }
@@ -366,46 +428,7 @@ function openCustomerOrders(){
   $$('[data-pay-customer]').forEach(b=>b.addEventListener('click',()=>openCustomerOrderPayment(orders.find(o=>o.id===b.dataset.payCustomer))));
   $$('[data-deliver-customer]').forEach(b=>b.addEventListener('click',()=>openCustomerOrderDelivery(orders.find(o=>o.id===b.dataset.deliverCustomer))));
 }
-function buildShareMessage(showQty = false) { const available = state.products.filter(p => p.activo && Number(p.stockDisponible ?? p.stock) > 0);
-  const troles = available.filter(p => p.categoria === 'Trol');
-  const others = available.filter(p => p.categoria !== 'Trol');
-  let lines = ['🍧 LA MICHOACANA 🍧','',
-    'Sabores disponibles hoy:',
-    '',
-    ...troles.map(
-      p =>
-        `${p.emoji || '🍧'} ${p.nombre}` +
-        (showQty
-          ? ` — ${Number(p.stockDisponible ?? p.stock)}`
-          : '')
-    )
-  ];
-
-  if (troles.length) {
-    lines.push('', `💲${troles[0].precioVenta} c/u`);
-  }
-
-  if (others.length) {
-    lines.push(
-      '',
-      'También tenemos:',
-      ...others.map(
-        p =>
-          `${p.emoji || '✨'} ${p.nombre}` +
-          (showQty
-            ? ` — ${Number(p.stockDisponible ?? p.stock)}`
-            : '') +
-          ` · ${money.format(p.precioVenta)}`
-      )
-    );
-  }
-
-  if (state.config?.mensajeWhatsApp) {
-    lines.push('', '✨ ' + state.config.mensajeWhatsApp);
-  }
-
-  return lines.join('\n');
-}
+function buildCustomerOrderMessage(o){return [`🍧 Pedido apartado`,`Cliente: ${o.clienteNombre}`,`Entrega: ${dateTime.format(new Date(o.fechaEntrega))}`,'',...(o.detalles||[]).map(d=>`${d.productoNombre||state.products.find(p=>p.productoId===d.productoId)?.nombre||d.productoId} × ${d.cantidad}`),'',`Total: ${money.format(Number(o.total||0))}`,Number(o.montoPendiente)>0?`Pendiente: ${money.format(Number(o.montoPendiente))}`:'Pagado ✅'].join('\n')}
 function shareCustomerOrder(o){window.open(`https://wa.me/?text=${encodeURIComponent(buildCustomerOrderMessage(o))}`,'_blank','noopener')}
 async function changeCustomerOrderStatus(id,estado){if(!await appConfirm(estado==='CANCELADO'?'Al cancelar, los productos vuelven a quedar disponibles. ¿Continuar?':'¿Confirmar este pedido?',estado==='CANCELADO'?'Cancelar apartado':'Confirmar apartado'))return;setLoading(true);try{await apiRequest('changeCustomerOrderStatus',{pedidoId:id,estado});await refreshAll(false);openCustomerOrders();toast('Pedido actualizado')}catch(e){toast(e.message,true)}finally{setLoading(false)}}
 function openCustomerOrderPayment(o){openModal(`Anticipo · ${o.clienteNombre}`,`<form id="customerPayForm" class="modal-form"><p>Pendiente: <strong>${money.format(Number(o.montoPendiente))}</strong></p><label>Monto<input id="customerPayAmount" type="number" min="0.01" max="${o.montoPendiente}" step="0.01" value="${o.montoPendiente}" required></label><label>Método<select id="customerPayMethod"><option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option><option value="OTRO">Otro</option></select></label><label>Referencia<input id="customerPayRef" placeholder="Opcional"></label><button class="primary-button">Guardar anticipo</button></form>`);$('#customerPayForm').addEventListener('submit',async e=>{e.preventDefault();setLoading(true);try{await apiRequest('payCustomerOrder',{pedidoId:o.id,metodo:$('#customerPayMethod').value,monto:Number($('#customerPayAmount').value),referencia:$('#customerPayRef').value});await refreshAll(false);openCustomerOrders();toast('Anticipo registrado')}catch(err){toast(err.message,true)}finally{setLoading(false)}})}
