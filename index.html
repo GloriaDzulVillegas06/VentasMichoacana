@@ -14,7 +14,7 @@
 <body>
   <div id="app" class="app-shell">
     <header class="topbar">
-      <div class="brand"><img src="assets/logo.png" alt=""><div><h1>🍧 La Michoacana</h1><p>Control de ventas</p></div></div>
+      <div class="brand"><img src="assets/logo.png" alt=""><div><h1>La Michoacana</h1><p>Control de ventas</p></div></div>
       <div class="top-actions"><button id="notificationBtn" class="notification-button" aria-label="Recordatorios">🔔<span id="notificationCount" hidden>0</span></button><span id="demoBadge" class="demo-badge" hidden>Configura Supabase</span></div>
     </header>
 
@@ -31,20 +31,22 @@
           <button class="quick-card green" id="quickEntry"><span>📦</span>Registrar mercancía</button>
           <button class="quick-card orange" data-go="order"><span>📝</span>Hacer pedido</button>
           <button class="quick-card purple" id="quickShare"><span>💬</span>Compartir existencias</button>
-          <button class="quick-card blue" id="quickCustomerOrder"><span>📅</span>Levantar apartado</button>
+          <button class="quick-card blue" id="quickCustomerOrder"><span>📅</span>Agregar apartado</button>
           <button class="quick-card teal" id="quickCustomerOrders"><span>🧺</span>Ver apartados</button>
         </div></section>
       </section>
 
       <section id="view-sale" class="view" aria-labelledby="saleTitle">
-        <div class="section-heading"><div><span class="eyebrow">Venta nueva</span><h2 id="saleTitle">¿Qué se vendió?</h2></div><button id="undoSaleBtn" class="text-button danger">↶ Deshacer última</button></div>
+        <div class="section-heading"><div><span class="eyebrow">Venta nueva</span><h2 id="saleTitle">¿Qué se vendió?</h2></div></div>
+        <details class="sale-utility"><summary>Más opciones</summary><button id="undoSaleBtn" class="text-button danger">↶ Deshacer última venta</button></details>
         <label class="field"><span>Vendedor</span><select id="sellerSelect"><option>Cargando vendedores…</option></select></label>
+        <label class="search-box">🔎<input id="saleSearch" type="search" placeholder="Buscar producto…" autocomplete="off"></label>
         <div id="saleProducts" class="product-grid"></div>
         <div class="sale-summary"><div><span>Productos</span><strong id="saleItemCount">0</strong></div><div><span>Total</span><strong id="saleTotal">$0</strong></div><button id="registerSaleBtn" class="primary-button" disabled>Registrar venta · $0</button></div>
       </section>
 
       <section id="view-inventory" class="view" aria-labelledby="inventoryTitle">
-        <div class="section-heading"><div><span class="eyebrow">Existencias</span><h2 id="inventoryTitle">Inventario</h2></div><div class="inventory-heading-actions"><button id="newProductBtn" class="small-button">+ Producto</button><button id="inventoryEntryBtn" class="small-button">+ Mercancía</button></div></div>
+        <div class="section-heading inventory-heading"><div><span class="eyebrow">Existencias</span><h2 id="inventoryTitle">Inventario</h2></div><div class="inventory-heading-actions"><button id="newProductBtn" class="small-button">+ Producto</button><button id="inventoryEntryBtn" class="small-button">+ Mercancía</button></div></div>
         <label class="search-box">🔎<input id="inventorySearch" type="search" placeholder="Buscar producto…" autocomplete="off"></label>
         <div class="legend"><span><i class="dot normal"></i>Normal</span><span><i class="dot low"></i>Bajo</span><span><i class="dot out"></i>Agotado</span></div>
         <div id="inventoryProducts" class="inventory-list"></div>
@@ -52,18 +54,20 @@
 
       <section id="view-order" class="view" aria-labelledby="orderTitle">
         <div class="section-heading"><div><span class="eyebrow">Reposición</span><h2 id="orderTitle">Hacer pedido</h2></div><button id="ordersHistoryBtn" class="text-button">Ver pedidos proveedor</button></div>
-        <div class="order-mode-actions"><button id="newCustomerOrderBtn" class="small-button">📅 Nuevo apartado</button><button id="customerOrdersBtn" class="small-button">🧺 Apartados clientes</button></div>
+        <div class="order-mode-actions"><button id="newCustomerOrderBtn" class="small-button">📅 Agregar apartado</button><button id="customerOrdersBtn" class="small-button">🧺 Apartados clientes</button></div>
         <article class="budget-card"><label for="budgetInput">Presupuesto disponible</label><div class="money-input"><span>$</span><input id="budgetInput" type="number" inputmode="decimal" min="0" step="10" placeholder="0"></div><button id="generateOrderBtn" class="secondary-button">✨ Generar recomendación</button></article>
+        <label class="search-box order-search">🔎<input id="orderSearch" type="search" aria-label="Buscar producto del pedido" placeholder="Buscar producto…" autocomplete="off"></label>
         <div id="orderProducts" class="order-list"></div>
-        <div id="orderSummary" class="order-summary" hidden><div><span>Total del pedido</span><strong id="orderTotal">$0</strong></div><div><span>Presupuesto restante</span><strong id="orderRemaining">$0</strong></div><button id="shareOrderBtn" class="whatsapp-button">💬 Enviar pedido por WhatsApp</button><button id="cancelOrderEditBtn" class="secondary-button" hidden>Cancelar edición</button><button id="createOrderBtn" class="primary-button">Guardar pedido</button></div>
+        <div id="orderActions" class="order-actions" hidden><button id="shareOrderBtn" class="whatsapp-button">💬 Enviar pedido por WhatsApp</button><button id="cancelOrderEditBtn" class="secondary-button" hidden>Cancelar edición</button></div>
+        <div id="orderSummary" class="order-summary" hidden><div class="order-summary-totals"><div><span>Total del pedido</span><strong id="orderTotal">$0</strong></div><div><span>Presupuesto restante</span><strong id="orderRemaining">$0</strong></div></div><button id="createOrderBtn" class="primary-button">Guardar pedido</button></div>
       </section>
 
       <section id="view-history" class="view" aria-labelledby="historyTitle">
         <div class="section-heading"><div><span class="eyebrow">Actividad</span><h2 id="historyTitle">Historial</h2></div></div>
         <div class="filter-tabs" id="historyFilters"><button data-period="today" class="active">Hoy</button><button data-period="week">Semana</button><button data-period="month">Mes</button><button data-period="custom">Personalizado</button></div>
-        <div id="customDates" class="date-fields" hidden><label>Desde<input id="dateFrom" type="date"></label><label>Hasta<input id="dateTo" type="date"></label><button id="applyDates" class="small-button">Aplicar</button></div>
+        <div id="customDates" class="date-fields" hidden><label>Desde<input id="dateFrom" type="date"></label><label>Hasta<input id="dateTo" type="date"></label><p class="date-format-hint">Selecciona las fechas con el calendario del teléfono.</p><button id="applyDates" class="small-button">Aplicar</button></div>
         <p id="historyRangeCaption" class="range-caption">Mostrando: Hoy</p>
-        <article class="panel receivables-panel"><div class="section-heading"><div><span class="eyebrow">Crédito</span><h2>Por cobrar</h2></div><strong id="receivablesTotal">$0</strong></div><div id="receivablesList" class="receivables-list"></div></article>
+        <details id="receivablesPanel" class="panel receivables-panel"><summary class="section-heading receivables-summary"><div><span class="eyebrow">Crédito</span><h2>Por cobrar</h2><small id="receivablesHint">Toca para ver los pagos pendientes</small></div><strong id="receivablesTotal">$0</strong></summary><div id="receivablesList" class="receivables-list"></div></details>
         <div id="historyStats" class="stats-strip"></div>
         <div id="salesHistory" class="history-list"></div>
         <article class="panel"><h2>Resumen de ventas</h2><div id="periodStatistics" class="period-statistics"></div></article>
